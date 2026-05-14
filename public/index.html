@@ -1,51 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ABB News Display</title>
-  <link rel="stylesheet" href="/index.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABB News Display</title>
+<link rel="stylesheet" href="/index.css">
 </head>
 <body>
 
-<nav class="navbar">
-    <div class="brand">
-        <div class="brand-main">ABB</div>
-        <div class="brand-line"></div>
-        <div class="brand-sub">Operational News Dispaly</div>
-    </div>
-
-    <div class="top-actions">
-        <button class="interval-button" id="changeIntervalBtn">
-            Slide Interval: <span id="slideIntervalValue">5 Seconds</span>
-        </button>
-
-        <div class="nav-links">
-            <a href="/">Slideshow</a>
-        </div>
-    </div>
-</nav>
-
-<main class="main">
-    <section class="slideshow">
-        <div class="slide-frame">
-            <img id="slide">
-            <div id="message">Loading images...</div>
-        </div>
-    </section>
-</main>
-
-<!-- Password modal -->
-<div id="passwordModal" class="modal" aria-hidden="true">
-    <div class="modal-backdrop" id="modalBackdrop"></div>
-    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-        <h3 id="modalTitle">Admin password</h3>
-        <input id="modalPasswordInput" type="password" placeholder="Enter admin password" autocomplete="current-password">
-        <div class="modal-actions">
-            <button id="modalCancel">Cancel</button>
-            <button id="modalSubmit">Submit</button>
-        </div>
-    </div>
+<div class="slide-frame">
+    <img id="slide">
+    <div id="message">Loading images...</div>
 </div>
 
 <script src="/index.js"></script>
