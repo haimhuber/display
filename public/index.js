@@ -1,98 +1,236 @@
-let images = [];
-let index = 0;
-let intervalId = null;
-let slideIntervalMs = 5000;
 
-const slide = document.getElementById("slide");
+let mediaFiles = [];
+
+let index = 0;
+
+let intervalId = null;
+
+const slideIntervalMs = 5000;
+
+const slideA = document.getElementById("slideA");
+const slideB = document.getElementById("slideB");
+const videoSlide = document.getElementById("videoSlide");
 const message = document.getElementById("message");
 
-function fetchImages(callback) {
-    fetch("/api/images?t=" + Date.now())
-        .then(response => response.json())
-        .then(data => {
-            images = data;
+// which image layer is currently visible: 'A' or 'B'
+let activeLayer = 'A';
 
-            if (callback) {
-                callback();
-            }
-        })
-        .catch(error => {
-            console.error(error);
-            message.innerHTML = "Image loading error";
-            message.style.display = "flex";
-        });
+function setMessage(text) {
+
+    message.textContent = text;
+    message.style.display = "flex";
+    console.log(text);
 }
 
-function loadImages() {
-    fetchImages(() => {
-        if (!images.length) {
-            message.innerHTML = "No images found";
-            message.style.display = "flex";
-            return;
+function hideMessage() {
+    message.style.display = "none";
+}
+
+function isVideo(fileName) {
+
+    return /\.(mp4|webm|ogg|mov)$/i.test(fileName);
+}
+
+async function fetchMediaFiles() {
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/images?t=" + Date.now()
+            );
+
+        if (!response.ok) {
+
+            throw new Error(
+                "API Error: " + response.status
+            );
         }
 
-        showImage();
-        startTimer();
-    });
+        mediaFiles = await response.json();
+
+        console.log(
+            "Media count:",
+            mediaFiles.length
+        );
+
+    } catch (err) {
+
+        setMessage(
+            "Failed loading media list"
+        );
+
+        console.error(err);
+    }
 }
 
-function startTimer() {
-    if (intervalId) {
-        clearInterval(intervalId);
+async function loadMedia() {
+
+    setMessage("Loading media list...");
+
+    await fetchMediaFiles();
+
+    if (!mediaFiles.length) {
+
+        setMessage(
+            "No images/videos found"
+        );
+
+        return;
     }
 
-    intervalId = setInterval(() => {
-        index++;
-
-        if (index >= images.length) {
-            index = 0;
-
-            fetchImages(() => {
-                if (images.length > 0) {
-                    showImage();
-                }
-            });
-        } else {
-            showImage();
-        }
-    }, slideIntervalMs);
+    showCurrentMedia();
 }
 
-function showImage() {
-    if (!images.length) return;
+function nextMedia() {
 
-    if (index >= images.length) {
+    index++;
+
+    if (index >= mediaFiles.length) {
+
         index = 0;
     }
 
-    const imageName = images[index];
+    showCurrentMedia();
+}
 
-    const imageUrl =
+function resetMediaElements() {
+
+    // hide both image layers and video
+    slideA.classList.remove('visible');
+    slideB.classList.remove('visible');
+
+    videoSlide.classList.remove('visible');
+    try { videoSlide.pause(); } catch(e) {}
+    videoSlide.removeAttribute('src');
+}
+
+function showCurrentMedia() {
+
+    if (!mediaFiles.length) {
+
+        return;
+    }
+
+    if (index >= mediaFiles.length) {
+
+        index = 0;
+    }
+
+    const fileName =
+        mediaFiles[index];
+
+    const mediaUrl =
         "/pics/" +
-        encodeURIComponent(imageName) +
+        encodeURIComponent(fileName) +
         "?t=" +
         Date.now();
 
-    const testImage = new Image();
+    console.log(
+        "Showing:",
+        fileName
+    );
 
-    testImage.onload = function () {
-        slide.src = imageUrl;
+    resetMediaElements();
 
-        slide.style.display = "none";
+    if (isVideo(fileName)) {
 
-        setTimeout(() => {
-            slide.style.display = "block";
-        }, 50);
+        showVideo(
+            mediaUrl,
+            fileName
+        );
 
-        message.style.display = "none";
-    };
+    } else {
 
-    testImage.onerror = function () {
-        message.innerHTML = "Image load failed";
-        message.style.display = "flex";
-    };
-
-    testImage.src = imageUrl;
+        showImage(
+            mediaUrl,
+            fileName
+        );
+    }
 }
 
-loadImages();
+function showImage(
+    imageUrl,
+    fileName
+) {
+
+    // Preload the incoming image then crossfade
+    const incoming = (activeLayer === 'A') ? slideB : slideA;
+    const outgoing = (activeLayer === 'A') ? slideA : slideB;
+
+    const img = new Image();
+    img.onload = () => {
+        incoming.src = imageUrl;
+        // ensure incoming is behind outgoing until we toggle
+        incoming.classList.add('visible');
+
+        // remove visible from outgoing after a short frame to trigger transition
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                outgoing.classList.remove('visible');
+            });
+        });
+
+        // swap active layer
+        activeLayer = (activeLayer === 'A') ? 'B' : 'A';
+
+        hideMessage();
+        startImageTimer();
+    };
+
+    img.onerror = () => {
+        setMessage('Image failed: ' + fileName);
+    };
+
+    img.src = imageUrl;
+}
+
+function startImageTimer() {
+
+    clearTimeout(intervalId);
+
+    intervalId =
+        setTimeout(() => {
+
+        nextMedia();
+
+    }, slideIntervalMs);
+}
+
+function showVideo(
+    videoUrl,
+    fileName
+) {
+
+    // Preload video then crossfade the video layer in
+    setMessage('Loading video...');
+
+    // prepare video element
+    videoSlide.src = videoUrl;
+    videoSlide.load();
+
+    videoSlide.onloadeddata = () => {
+        // bring video layer in
+        videoSlide.classList.add('visible');
+
+        // hide both image layers
+        slideA.classList.remove('visible');
+        slideB.classList.remove('visible');
+
+        hideMessage();
+
+        const p = videoSlide.play();
+        if (p && p.then) {
+            p.then(() => console.log('Video autoplay started'))
+             .catch(err => { console.error(err); setMessage('Video autoplay failed'); });
+        }
+    };
+
+    videoSlide.onerror = () => {
+        setMessage('Video failed: ' + fileName);
+    };
+
+    videoSlide.onended = () => nextMedia();
+}
+
+loadMedia();

@@ -8,10 +8,17 @@ const app = express();
 const PORT = 3002;
 const PICS_DIR = "C:\\ABB_Pics";
 
-const ADMIN_PASSWORD = "admin1234!";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin1234!";
+
+if (!process.env.ADMIN_PASSWORD) {
+    console.warn('WARNING: ADMIN_PASSWORD not set in environment; using fallback. Set ADMIN_PASSWORD env variable to secure this server.');
+}
 const DEFAULT_SLIDE_INTERVAL_SECONDS = 5;
 
-const allowedExtensions = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
+const allowedExtensions = [
+  ".jpg", ".jpeg", ".png", ".webp", ".gif",
+  ".mp4", ".webm", ".ogg"
+];
 
 function getAllIPs() {
     const interfaces = os.networkInterfaces();
@@ -33,6 +40,21 @@ app.use("/pics", express.static(PICS_DIR));
 
 // JSON body parsing for API endpoints
 app.use(express.json());
+
+// In-memory client tracking
+const clients = new Map(); // key: ip, value: { ip, userAgent, path, lastSeen }
+
+function recordClient(req, res, next) {
+    const ip = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.socket.remoteAddress;
+    const ua = req.headers['user-agent'] || '';
+    const path = req.path;
+
+    clients.set(ip, { ip, userAgent: ua, path, lastSeen: Date.now() });
+    next();
+}
+
+// apply to all API and static requests
+app.use(recordClient);
 
 // Serve static frontend from the public directory
 app.use(express.static(path.join(__dirname, "public")));
@@ -69,6 +91,19 @@ app.post('/api/verify-password', (req, res) => {
     if (password === ADMIN_PASSWORD) return res.json({ ok: true });
 
     return res.status(401).json({ ok: false });
+});
+
+// Protected endpoint to list recent clients (POST with { password })
+app.post('/api/clients', (req, res) => {
+    const { password } = req.body || {};
+    if (password !== ADMIN_PASSWORD) return res.status(401).json({ ok: false });
+
+    // return clients as array sorted by lastSeen desc
+    const arr = Array.from(clients.values())
+        .sort((a, b) => b.lastSeen - a.lastSeen)
+        .map(c => ({ ip: c.ip, userAgent: c.userAgent, path: c.path, lastSeen: c.lastSeen }));
+
+    res.json({ ok: true, clients: arr });
 });
 
 app.listen(PORT, "0.0.0.0", () => {
