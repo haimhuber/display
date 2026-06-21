@@ -1,36 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta
+  <meta charset="UTF-8">
+
+  <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0"
-/>
+  >
 
-<title>ABB Media Display</title>
+  <title>ABB Media Display</title>
 
-<link rel="stylesheet" href="/index.css">
+  <link rel="stylesheet" href="/index.css?v=11">
 </head>
 
 <body>
+  <div class="slide-frame">
 
-<div class="slide-frame">
-
-    <!-- Two layered images for crossfade -->
     <img id="slideA" class="media-layer" alt="slide A">
     <img id="slideB" class="media-layer" alt="slide B">
 
-    <!-- Video layer (also participates in crossfade) -->
     <video id="videoSlide" class="media-layer" muted playsinline></video>
 
-    <!-- Message overlay (used only for errors or initial loading list) -->
-    <div id="message">
-        Loading media...
-    </div>
+    <div id="message">Loading media...</div>
 
-</div>
+  </div>
 
-<script src="/index.js"></script>
-
+  <script src="/index.js?v=11"></script>
 </body>
 </html>

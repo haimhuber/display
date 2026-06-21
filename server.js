@@ -41,6 +41,8 @@ app.use("/pics", express.static(PICS_DIR));
 // JSON body parsing for API endpoints
 app.use(express.json());
 
+
+
 // In-memory client tracking
 const clients = new Map(); // key: ip, value: { ip, userAgent, path, lastSeen }
 
