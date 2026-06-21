@@ -2,12 +2,14 @@
   var IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
   var VIDEO_EXTENSIONS = [".mp4", ".webm", ".ogg"];
 
-  var DEBUG = false;
+  var AUTO_REFRESH_SECONDS = 10;
 
   var mediaFiles = [];
+  var mediaSignature = "";
   var currentIndex = 0;
   var currentImageLayer = "A";
   var slideIntervalSeconds = 5;
+  var refreshTimer = null;
 
   var slideA = null;
   var slideB = null;
@@ -19,16 +21,6 @@
     slideB = document.getElementById("slideB");
     videoSlide = document.getElementById("videoSlide");
     message = document.getElementById("message");
-  }
-
-  function log(text, data, level) {
-    if (!DEBUG) return;
-
-    if (!level) level = "info";
-
-    try {
-      console.log("[ABB DISPLAY][" + level + "] " + text, data || "");
-    } catch (e) {}
   }
 
   function getExtension(fileName) {
@@ -70,17 +62,17 @@
     xhr.onload = function () {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          success(JSON.parse(xhr.responseText), xhr.status);
+          success(JSON.parse(xhr.responseText));
         } catch (e) {
-          fail("JSON parse error: " + e.message);
+          fail();
         }
       } else {
-        fail("HTTP " + xhr.status + " from " + url);
+        fail();
       }
     };
 
     xhr.onerror = function () {
-      fail("Network error loading " + url);
+      fail();
     };
 
     xhr.send();
@@ -88,42 +80,51 @@
 
   function loadConfig(next) {
     xhrGetJson(
-      "/api/config?v=" + Date.now(),
+      "/api/config?t=" + Date.now(),
       function (config) {
         if (config && Number(config.defaultSlideIntervalSeconds) > 0) {
           slideIntervalSeconds = Number(config.defaultSlideIntervalSeconds);
         }
 
-        log("Config loaded", config);
         next();
       },
-      function (err) {
-        log("Config failed, using default", err, "warn");
+      function () {
         slideIntervalSeconds = 5;
         next();
       }
     );
   }
 
+  function normalizeMediaFiles(files) {
+    var result = [];
+
+    if (!files || !files.length) {
+      return result;
+    }
+
+    for (var i = 0; i < files.length; i++) {
+      if (isImage(files[i]) || isVideo(files[i])) {
+        result.push(files[i]);
+      }
+    }
+
+    return result;
+  }
+
+  function buildSignature(files) {
+    return files.join("|");
+  }
+
   function loadMediaList() {
     xhrGetJson(
-      "/api/images?v=" + Date.now(),
+      "/api/images?t=" + Date.now(),
       function (files) {
-        if (!files || !files.length) {
-          showMessage("No media files found");
-          return;
-        }
-
-        mediaFiles = [];
-
-        for (var i = 0; i < files.length; i++) {
-          if (isImage(files[i]) || isVideo(files[i])) {
-            mediaFiles.push(files[i]);
-          }
-        }
+        mediaFiles = normalizeMediaFiles(files);
+        mediaSignature = buildSignature(mediaFiles);
+        currentIndex = 0;
 
         if (!mediaFiles.length) {
-          showMessage("No supported media files");
+          showMessage("No media files found");
           return;
         }
 
@@ -136,8 +137,34 @@
     );
   }
 
+  function refreshMediaListSilent() {
+    xhrGetJson(
+      "/api/images?t=" + Date.now(),
+      function (files) {
+        var updatedFiles = normalizeMediaFiles(files);
+        var newSignature = buildSignature(updatedFiles);
+
+        if (newSignature === mediaSignature) {
+          return;
+        }
+
+        mediaSignature = newSignature;
+        mediaFiles = updatedFiles;
+        currentIndex = 0;
+
+        if (!mediaFiles.length) {
+          showMessage("No media files found");
+          return;
+        }
+
+        hideMessage();
+      },
+      function () {}
+    );
+  }
+
   function getMediaUrl(file) {
-    return "/pics/" + encodeURIComponent(file);
+    return "/pics/" + encodeURIComponent(file) + "?t=" + Date.now();
   }
 
   function showNextMedia() {
@@ -145,12 +172,6 @@
 
     var file = mediaFiles[currentIndex];
     var src = getMediaUrl(file);
-
-    log("Showing media", {
-      index: currentIndex,
-      file: file,
-      src: src
-    });
 
     if (isImage(file)) {
       showImage(file, src);
@@ -254,16 +275,15 @@
     }
   }
 
-  window.onerror = function (msg, url, line, col) {
-    log("WINDOW ERROR", {
-      msg: msg,
-      url: url,
-      line: line,
-      col: col
-    }, "error");
+  function startAutoRefresh() {
+    if (refreshTimer) {
+      clearInterval(refreshTimer);
+    }
 
-    return false;
-  };
+    refreshTimer = setInterval(function () {
+      refreshMediaListSilent();
+    }, AUTO_REFRESH_SECONDS * 1000);
+  }
 
   function start() {
     initElements();
@@ -272,6 +292,7 @@
 
     loadConfig(function () {
       loadMediaList();
+      startAutoRefresh();
     });
   }
 

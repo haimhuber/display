@@ -41,7 +41,7 @@ body {
   background: #000;
 
   opacity: 0;
-  transition: opacity var(--fade-duration, 700ms) ease-in-out;
+  transition: opacity 700ms ease-in-out;
   will-change: opacity;
 
   pointer-events: none;
@@ -64,8 +64,4 @@ body {
   z-index: 5;
 
   background: rgba(0, 0, 0, 0.55);
-}
-
-#message.hidden {
-  display: none;
 }
